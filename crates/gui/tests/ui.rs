@@ -578,7 +578,8 @@ fn replace_flow(scheme: ColorScheme, tag: &str) {
                     beside.push(ext);
                 }
                 let beside = path.with_file_name(beside);
-                let skipped = first.contains(&format!("'{name}'"));
+                // Windows shows the path with its own separator.
+                let skipped = first.replace('\\', "/").contains(&format!("'{name}'"));
                 assert_eq!(beside.exists(), !skipped, "{name}");
             }
             assert!(!archive.exists());
