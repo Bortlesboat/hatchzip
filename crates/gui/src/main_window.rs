@@ -600,6 +600,7 @@ impl App {
             verify_first: ui.get_verify_first(),
             keep_archive: keep,
             password: self.password.borrow().clone(),
+            here: false,
         };
         // On Windows our read handle would block the exclusive one the
         // extraction takes, so the worker closes it first, waiting out any
