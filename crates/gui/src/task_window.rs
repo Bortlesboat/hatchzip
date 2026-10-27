@@ -93,6 +93,15 @@ pub fn build(args: TaskArgs, settings: Settings) -> Result<(TaskWindow, impl FnO
         }
     });
     ui.set_task(task.view.clone());
+    if settings.close_when_done {
+        // Hiding the only window ends the app, as the close button does.
+        let weak = ui.as_weak();
+        runner.when_extracted(move || {
+            if let Some(ui) = weak.upgrade() {
+                let _ = ui.hide();
+            }
+        });
+    }
 
     let r = runner.clone();
     ui.on_pause(move || r.pause());

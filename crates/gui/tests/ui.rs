@@ -211,6 +211,42 @@ fn one(kind: TaskKind, archive: &Path) -> TaskArgs {
     }
 }
 
+/// The small window stays open when it is done, so a flow can read and
+/// capture the finished state.
+fn stay_open() -> Settings {
+    Settings {
+        close_when_done: false,
+        ..Settings::default()
+    }
+}
+
+/// By default the small window closes itself once everything is extracted,
+/// as other extractors' do, but a test's result stays on screen.
+fn close_flow() {
+    let dir = tempfile::tempdir().unwrap();
+    let archive = make_zip(dir.path());
+    let (ui, start) =
+        task_window::build(one(TaskKind::Test, &archive), Settings::default()).unwrap();
+    start();
+    let w = ui.as_weak();
+    wait_until("the test", move || {
+        w.unwrap().get_task().phase == Phase::Done
+    });
+    assert!(ui.window().is_visible(), "a test's result stays on screen");
+    ui.hide().unwrap();
+
+    let (ui, start) =
+        task_window::build(one(TaskKind::ExtractTo, &archive), Settings::default()).unwrap();
+    assert!(ui.window().is_visible());
+    start();
+    let w = ui.as_weak();
+    wait_until("the extraction", move || {
+        w.unwrap().get_task().phase == Phase::Done
+    });
+    assert!(!ui.window().is_visible(), "the window closed itself");
+    assert!(dir.path().join("northwind/Northwind/README.txt").exists());
+}
+
 /// Unticking "Remove the archive during extraction" plans for every file,
 /// remembers the choice, and extracts without touching the archive.
 fn keep_flow(scheme: ColorScheme, tag: &str) {
@@ -282,7 +318,7 @@ fn keep_task_flow(scheme: ColorScheme, tag: &str) {
         keep_archive: true,
         ..one(TaskKind::ExtractHere, &archive)
     };
-    let (ui, start) = task_window::build(args, Settings::default()).unwrap();
+    let (ui, start) = task_window::build(args, stay_open()).unwrap();
     ui.global::<Palette>().set_color_scheme(scheme);
     ui.window().set_size(LogicalSize::new(480.0, 250.0));
     start();
@@ -318,7 +354,7 @@ fn queue_flow(scheme: ColorScheme, tag: &str) {
         archives: archives.clone(),
         keep_archive: false,
     };
-    let (ui, start) = task_window::build(args, Settings::default()).unwrap();
+    let (ui, start) = task_window::build(args, stay_open()).unwrap();
     ui.global::<Palette>().set_color_scheme(scheme);
     ui.window().set_size(LogicalSize::new(480.0, 270.0));
     start();
@@ -377,6 +413,7 @@ fn queue_flow(scheme: ColorScheme, tag: &str) {
         "Archive 2 of 3. 1 more archive has not started."
     );
     assert_eq!(ui.get_task().heading, "Extraction failed");
+    assert!(ui.window().is_visible(), "a failure stays on screen");
     assert!(!archives[0].exists());
     assert!(archives[1].exists() && archives[2].exists());
     assert!(!dir.path().join("Northwind-3").exists());
@@ -388,8 +425,7 @@ fn queue_flow(scheme: ColorScheme, tag: &str) {
 fn task_window_flow(scheme: ColorScheme, tag: &str) {
     let dir = tempfile::tempdir().unwrap();
     let archive = make_zip(dir.path());
-    let (ui, start) =
-        task_window::build(one(TaskKind::ExtractTo, &archive), Settings::default()).unwrap();
+    let (ui, start) = task_window::build(one(TaskKind::ExtractTo, &archive), stay_open()).unwrap();
     ui.global::<Palette>().set_color_scheme(scheme);
     ui.window().set_size(LogicalSize::new(480.0, 250.0));
     // Nothing happens before the window says go.
@@ -444,7 +480,7 @@ fn replace_flow(scheme: ColorScheme, tag: &str) {
 
     for replace in [false, true] {
         let (ui, start) =
-            task_window::build(one(TaskKind::ExtractTo, &archive), Settings::default()).unwrap();
+            task_window::build(one(TaskKind::ExtractTo, &archive), stay_open()).unwrap();
         ui.global::<Palette>().set_color_scheme(scheme);
         ui.window().set_size(LogicalSize::new(480.0, 250.0));
         start();
@@ -695,4 +731,5 @@ fn windows_end_to_end() {
             shell_switch_flow(scheme, tag, data.path());
         }
     }
+    close_flow();
 }
