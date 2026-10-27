@@ -173,7 +173,7 @@ fn explorer_menu_points_at_the_gui_and_goes_away_cleanly() {
         hatchzip_shell::explorer::clsid_string()
     );
     assert!(hkcu.open_subkey(&clsid).is_err());
-    let extract_to = format!(r"{base}\.zip\shell\HatchZip\shell\03extract-to");
+    let extract_to = format!(r"{base}\.zip\shell\HatchZip\shell\04extract-to");
     let item = hkcu.open_subkey(&extract_to).unwrap();
     assert!(
         item.get_value::<String, _>("ExplorerCommandHandler")
