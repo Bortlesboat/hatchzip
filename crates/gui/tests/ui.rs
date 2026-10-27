@@ -220,6 +220,53 @@ fn stay_open() -> Settings {
     }
 }
 
+/// "Extract here" on an archive of loose files puts them in a folder named
+/// after it rather than among whatever is next to the archive. One folder at
+/// the top goes next to the archive, as `keep_task_flow` checks.
+fn here_flow() {
+    let dir = tempfile::tempdir().unwrap();
+    let archive = dir.path().join("loose.zip");
+    let mut w = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+    for name in ["readme.txt", "data/level.pak"] {
+        w.start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        w.write_all(name.as_bytes()).unwrap();
+    }
+    w.finish().unwrap();
+    let (ui, start) =
+        task_window::build(one(TaskKind::ExtractHere, &archive), stay_open()).unwrap();
+    start();
+    let w = ui.as_weak();
+    wait_until("the extraction", move || {
+        w.unwrap().get_task().phase == Phase::Done
+    });
+    assert!(dir.path().join("loose/readme.txt").exists());
+    assert!(dir.path().join("loose/data/level.pak").exists());
+    assert!(!dir.path().join("readme.txt").exists());
+    assert_eq!(
+        ui.get_task().detail,
+        format!("Destination: {}", dir.path().join("loose").display())
+    );
+    ui.hide().unwrap();
+
+    // "Extract files…" goes exactly where the person pointed the picker.
+    let archive = make_zip(dir.path());
+    let chosen = dir.path().join("elsewhere");
+    std::fs::create_dir(&chosen).unwrap();
+    let args = one(TaskKind::ExtractFiles(Some(chosen.clone())), &archive);
+    let (ui, start) = task_window::build(args, stay_open()).unwrap();
+    start();
+    let w = ui.as_weak();
+    wait_until("the extraction", move || {
+        w.unwrap().get_task().phase == Phase::Done
+    });
+    assert!(chosen.join("Northwind/README.txt").exists());
+    assert!(!archive.exists());
+    ui.hide().unwrap();
+    // Without a folder there is nothing to run.
+    assert!(task_window::build(one(TaskKind::ExtractFiles(None), &archive), stay_open()).is_err());
+}
+
 /// By default the small window closes itself once everything is extracted,
 /// as other extractors' do, but a test's result stays on screen.
 fn close_flow() {
@@ -732,4 +779,5 @@ fn windows_end_to_end() {
         }
     }
     close_flow();
+    here_flow();
 }
